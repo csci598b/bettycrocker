@@ -15,6 +15,21 @@ import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
+/**
+ * A Track is responsible for playing the audio from a single
+ * mp3 file. It is created by using the constructor which accepts
+ * the name of the mp3 file.
+ * 
+ * Typically, this class is not referenced directly other than
+ * creating the track, and setting the controls for the Track which
+ * include gain, muting, and a 32 channel equalizer.
+ * 
+ * Normally a Song is created and is responsible for playing any Tracks
+ * that might have been created.
+ * 
+ * @author John
+ *
+ */
 public class Track {
 	
 	private File soundFile;
@@ -24,17 +39,13 @@ public class Track {
 	private AudioFormat decodedAudioFormat;
 	private SourceDataLine sourceDataLine;
 	
-	private CountDownLatch startLatch;
+	private CountDownLatch startLatch; //Used by the Song class to be started with the other Tracks
 	
 	private FloatControl gainControl;
 	private BooleanControl muteControl;
-	//private FloatControl panControl; //PAN ISN'T WORKING FOR SOME REASON
-	//private FloatControl balanceControl; //BALANCE ISN'T WORKING FOR SOME REASON
 	
 	private float gain = 0.0f;
 	private boolean mute = false;
-	//private float balance = 0.0f; //BALANCE ISN'T WORKING FOR SOME REASON
-	//private float pan = 0.0f; //PAN ISN'T WORKING FOR SOME REASON
 	private float[] equalizer = new float[32];
 	
 	private boolean isPlaying = false;
@@ -70,28 +81,37 @@ public class Track {
 		this.gain = gain;
 	}
 	
-	//PAN ISN'T WORKING FOR SOME REASON
-	//public void setPan(float pan) {
-	//	this.pan = pan;
-	//}
-	
-	//BALANCE ISN'T WORKING FOR SOME REASON
-	//public void setBalance(float balance) {
-	//	this.balance = balance;
-	//}
-	
 	public void setMute(boolean mute) {
 		this.mute = mute;
 	}
 	
+	/**
+	 * This method applies an EQ filter based on a 32 channel EQ that
+	 * is set by the float array. The indices of the array correspond
+	 * to each of the frequency levels that can be adjusted, with the
+	 * lower indices corresponding to the lower frequencies (bass), and the
+	 * higher indices corresponding to the higher frequencies (treble).
+	 * 
+	 * This method makes no assumption on the size of the array passed to it
+	 * and will only set the first 32 indices in the array.
+	 * 
+	 * @param equalizer
+	 */
 	public void setEqualizer(float[] equalizer) {
 		System.arraycopy(equalizer, 0, this.equalizer , 0, 32);
 	}
 	
+	/*
+	 * An internal method that sets the values for a BooleanControl.
+	 */
 	private void adjustBooleanControl(BooleanControl control, boolean value) {
 		control.setValue(value);
 	}
 	
+	/*
+	 * An internal method that ensures the values used to set a FloatControl
+	 * are within the bounds of the control.
+	 */
 	private void adjustFloatControl(FloatControl control, float value) {
 		if (value < control.getMaximum() && value > control.getMinimum())
 			control.setValue(value);
@@ -102,6 +122,10 @@ public class Track {
 		}
 	}
 	
+	/*
+	 * An internal method that returns the correct decoded audio format for the
+	 * types of files being used.
+	 */
 	private AudioFormat getDecodedAudioFormat(AudioFormat baseFormat) {
 		AudioFormat.Encoding encoding = AudioFormat.Encoding.PCM_SIGNED;
 		float sampleRate = baseFormat.getSampleRate();
@@ -116,40 +140,35 @@ public class Track {
 	
 	
 	private class PlayThread extends Thread {
-		private final int BUFFER_SIZE = 2000;
-		private byte tempBuffer[] = new byte[BUFFER_SIZE];
+		private final int BUFFER_SIZE = 2000; //Decent buffer size found with experimentation
+		private byte tempBuffer[] = new byte[BUFFER_SIZE]; //Used to transfer data from the input and output streams
 		
 		public void run() {
 			try {
+				//Wait until the CountDownLatch has been 'lifted'
 				startLatch.await();
 				
 				try {
+					//Read the sound file
 					audioInputStream = AudioSystem.getAudioInputStream(soundFile);
 					audioFormat = audioInputStream.getFormat();
 					
+					//Decode the sound file
 					decodedAudioFormat = getDecodedAudioFormat(audioFormat);
 					decodedAudioInputStream = AudioSystem.getAudioInputStream(decodedAudioFormat, audioInputStream);
 					
+					//Get a source data line to put the sound file on
 					DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, decodedAudioFormat);
 					sourceDataLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
-	
 					sourceDataLine.open(decodedAudioFormat);
 					
+					//Get the controls for the stream if they are supported
 					if (sourceDataLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
 						gainControl = (FloatControl) sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN);
 					}
 					if (sourceDataLine.isControlSupported(BooleanControl.Type.MUTE)) {
 						muteControl = (BooleanControl) sourceDataLine.getControl(BooleanControl.Type.MUTE);
 					}
-					//PAN ISN'T WORKING FOR SOME REASON
-					//if (sourceDataLine.isControlSupported(FloatControl.Type.PAN)) {
-					//	panControl = (FloatControl) sourceDataLine.getControl(FloatControl.Type.PAN);
-					//}
-					//BALANCE ISN'T WORKING FOR SOME REASON
-					//if (sourceDataLine.isControlSupported(FloatControl.Type.BALANCE)) {
-					//	balanceControl = (FloatControl) sourceDataLine.getControl(FloatControl.Type.BALANCE);
-					//}
-					
 					float[] equalizerControl = new float[32];
 					if (decodedAudioInputStream instanceof javazoom.spi.PropertiesContainer) {
 						@SuppressWarnings("rawtypes")
@@ -157,34 +176,32 @@ public class Track {
 						equalizerControl = (float[]) properties.get("mp3.equalizer");
 					}
 					
+					//Start streaming the sound file
 					sourceDataLine.start();
 	
 					int count;
 					while ((count = decodedAudioInputStream.read(tempBuffer, 0, tempBuffer.length)) != -1 && isPlaying) {
 						if (count > 0) {
+							//Set the controls for the stream if they are supported
 							if (sourceDataLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
 								adjustFloatControl(gainControl, gain);
 							}
 							if (sourceDataLine.isControlSupported(BooleanControl.Type.MUTE)) {
 								adjustBooleanControl(muteControl, mute);
 							}
-							//PAN ISN'T WORKING FOR SOME REASON
-							//if (sourceDataLine.isControlSupported(FloatControl.Type.PAN)) {
-							//	adjustFloatControl(panControl, pan);
-							//}
-							//BALANCE ISN'T WORKING FOR SOME REASON
-							//if (sourceDataLine.isControlSupported(FloatControl.Type.BALANCE)) {
-							//	adjustFloatControl(balanceControl, balance);
-							//}
 							System.arraycopy(equalizer, 0, equalizerControl, 0, 32);
 							
+							//Write the data line to the buffer
 							sourceDataLine.write(tempBuffer, 0, count);
 						}
 					}
+					//The sound file is finished at this point
 					
+					//Clean up the data line
 					sourceDataLine.drain();
 					sourceDataLine.close();
 					
+					//Close the stream
 					audioInputStream.close();
 					decodedAudioInputStream.close();
 					
