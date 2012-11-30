@@ -207,7 +207,13 @@ public class Track {
 					
 					isPlaying = false;
 					
-				} catch (IOException | UnsupportedAudioFileException | LineUnavailableException e) {
+				} catch (IOException e) {
+					e.printStackTrace();
+					System.exit(0);
+				} catch (UnsupportedAudioFileException e) {
+					e.printStackTrace();
+					System.exit(0);
+				} catch (LineUnavailableException e) {
 					e.printStackTrace();
 					System.exit(0);
 				}
