@@ -50,10 +50,17 @@ public class Track {
 	
 	private boolean isPlaying = false;
 	
+	/**
+	 * Creates a Track from the supplied file path.
+	 * @param fileName
+	 */
 	public Track(String fileName) {
 		soundFile = new File(fileName);
 	}
 	
+	/**
+	 * Starts playing the Track.
+	 */
 	public void startPlaying() {
 		if (!isPlaying) {
 			isPlaying = true;
@@ -61,32 +68,57 @@ public class Track {
 		}
 	}
 	
+	/**
+	 * Stops playing the Track.
+	 */
 	public void stopPlaying() {
 		isPlaying = false;
 	}
 
+	/**
+	 * Returns whether the Track is currently playing.
+	 * @return
+	 */
 	public boolean isPlaying() {
 		return isPlaying;
 	}
 	
+	/**
+	 * Returns the sound file associated with this Track.
+	 * @return
+	 */
 	public File getSoundFile() {
 		return soundFile;
 	}
 	
+	/**
+	 * Sets the start latch for synchronizing the Tracks with each
+	 * other. This does not typically get called, except by the Song
+	 * class when starting to play the Tracks.
+	 * @param startLatch
+	 */
 	public void setStartLatch(CountDownLatch startLatch) {
 		this.startLatch = startLatch;
 	}
 	
+	/**
+	 * Sets the gain control value for the Track.
+	 * @param gain
+	 */
 	public void setGain(float gain) {
 		this.gain = gain;
 	}
 	
+	/**
+	 * Sets the mute control value for the track.
+	 * @param mute
+	 */
 	public void setMute(boolean mute) {
 		this.mute = mute;
 	}
 	
 	/**
-	 * This method applies an EQ filter based on a 32 channel EQ that
+	 * Applies an EQ filter based on a 32 channel EQ that
 	 * is set by the float array. The indices of the array correspond
 	 * to each of the frequency levels that can be adjusted, with the
 	 * lower indices corresponding to the lower frequencies (bass), and the
@@ -138,7 +170,10 @@ public class Track {
 		return new AudioFormat(encoding, sampleRate, sampleSizeInBits, channels, frameSize, frameRate, bigEndian);
 	}
 	
-	
+	/*
+	 * An internal class responsible for playing the Track without blocking the 
+	 * main execution.
+	 */
 	private class PlayThread extends Thread {
 		private final int BUFFER_SIZE = 2000; //Decent buffer size found with experimentation
 		private byte tempBuffer[] = new byte[BUFFER_SIZE]; //Used to transfer data from the input and output streams

@@ -32,74 +32,91 @@ public class SoundEffect {
 	private Clip clip;
 	private AudioInputStream audioStream;
 	
+	/**
+	 * Creates a SoundEffect from the supplied file path.
+	 * @param fileName
+	 */
 	public SoundEffect(String fileName) {
 		soundFile = new File(fileName);
 	}
 	
+	/**
+	 * Plays the SoundEffect once.
+	 */
 	public void play() {
-		new PlayThread().start();
+		play(1);
 	}
 	
+	/**
+	 * Plays the sound effect a user defined
+	 * amount of times.
+	 * @param times
+	 */
 	public void play(int times) {
-		clip.loop(times - 1); //The Clip method for looping states 0 will play it once)
+		try {
+			audioStream = AudioSystem.getAudioInputStream(soundFile);
+			
+			clip = AudioSystem.getClip();
+			clip.open(audioStream);
+		
+			clip.addLineListener( new LineListener() {
+				@Override
+				public void update(LineEvent evt) {
+					if (evt.getType() == LineEvent.Type.STOP) {
+				    evt.getLine().close();
+				  }
+				}
+			});
+			
+			if (times != Clip.LOOP_CONTINUOUSLY) {
+				clip.loop(times - 1); //The Clip method for looping states 0 will play it once)
+			}	else {
+				clip.loop(Clip.LOOP_CONTINUOUSLY);
+			}
+		} catch (UnsupportedAudioFileException e) {
+			System.out.println("Unsupported audio file.");
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("Problem reading the audio file.");
+			e.printStackTrace();
+		} catch (LineUnavailableException e) {
+			System.out.println("Dataline is not available.");
+			e.printStackTrace();
+		}
 	}
 	
+	/**
+	 * Plays the SoundEffect indefinitely.
+	 */
 	public void loop() {
-		clip.loop(Clip.LOOP_CONTINUOUSLY);
+		play(Clip.LOOP_CONTINUOUSLY);
 	}
 	
+	/**
+	 * Stops playing the SoundEffect
+	 */
 	public void stop() {
 		if (clip.isRunning()) {
 			clip.stop();
 		}
 	}
 	
+	/**
+	 * Returns the sound file associated with this
+	 * SoundEffect.
+	 * @return
+	 */
 	public File getSoundFile() {
 		return soundFile;
 	}
 	
+	/**
+	 * Sets the volume of the SoundEffect.
+	 * @param newVolume
+	 */
 	public void setVolume(float newVolume) {
 		FloatControl volume = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
 		volume.setValue(newVolume);
-	}
-	
-	
-	/*
-	 * This class is used to play the SoundEffect in a separate
-	 * thread so that the main application isn't interrupted.
-	 */
-	private class PlayThread extends Thread {
-		
-		public void run() {
-			try {
-				audioStream = AudioSystem.getAudioInputStream(soundFile);
-				
-				clip = AudioSystem.getClip();
-				clip.open(audioStream);
-				
-				clip.addLineListener( new LineListener() {
-					@Override
-					public void update(LineEvent evt) {
-						 if (evt.getType() == LineEvent.Type.STOP) {
-					     evt.getLine().close();
-					   }
-					}
-				});
-				
-				clip.start();
-			} catch (UnsupportedAudioFileException e) {
-				System.out.println("Unsupported audio file: " + soundFile.getName());
-				e.printStackTrace();
-			} catch (IOException e) {
-				System.out.println("Error reading the file: " + soundFile.getName());
-				e.printStackTrace();
-			} catch (LineUnavailableException e) {
-				System.out.println("Problem playing sound file: " + soundFile.getName() + ". Line was unavailable for playback.");
-				e.printStackTrace();
-			}
-			
-		}
-
 	}
 	
 }
